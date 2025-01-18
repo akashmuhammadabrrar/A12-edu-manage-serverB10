@@ -1,5 +1,6 @@
 const express = require("express");
 const app = express();
+const jwt = require("jsonwebtoken");
 const cors = require("cors");
 require("dotenv").config();
 
@@ -32,6 +33,15 @@ async function run() {
       .db("EduManage")
       .collection("teacher-req");
 
+    // jwt related api
+    app.post("/jwt", async (req, res) => {
+      const user = req.body; // payload--> (user)
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: "10h",
+      }); // payload,tokenSecret,exP.
+      res.send({ token }); // send the token as an object
+    });
+
     // get all the classes API
     app.get("/classes", async (req, res) => {
       const result = await classCollectionTeacher.find().toArray();
@@ -55,6 +65,19 @@ async function run() {
       const result = await usersCollection.find().toArray();
       res.send(result);
     });
+    // make admin related api
+    app.patch("/users/admin/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          role: "admin",
+        },
+      };
+      const result = await usersCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    });
+    // delete an user by id
     app.delete("/users/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
