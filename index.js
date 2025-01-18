@@ -58,6 +58,18 @@ async function run() {
       });
     };
 
+    // use verify admin after verify token
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.decoded.email;
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      const isAdmin = user?.role === "admin";
+      if (!isAdmin) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
+      next();
+    };
+
     // get all the classes API
     app.get("/classes", async (req, res) => {
       const result = await classCollectionTeacher.find().toArray();
@@ -93,7 +105,7 @@ async function run() {
       res.send(result);
     });
     // get all users
-    app.get("/users", verifyToken, async (req, res) => {
+    app.get("/users", verifyToken, verifyAdmin, async (req, res) => {
       const result = await usersCollection.find().toArray();
       res.send(result);
     });
