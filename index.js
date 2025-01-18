@@ -42,6 +42,22 @@ async function run() {
       res.send({ token }); // send the token as an object
     });
 
+    // middlewares
+    const verifyToken = (req, res, next) => {
+      console.log("Inside verify token", req.headers.authorization);
+      if (!req.headers.authorization) {
+        res.status(401).send({ message: "unauthorized access" });
+      }
+      const token = req.headers.authorization.split(" ")[1];
+      jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+        if (err) {
+          return res.status(401).send({ message: "unauthorized access" });
+        }
+        req.decoded = decoded;
+        next();
+      });
+    };
+
     // get all the classes API
     app.get("/classes", async (req, res) => {
       const result = await classCollectionTeacher.find().toArray();
@@ -49,6 +65,22 @@ async function run() {
     });
 
     // users related api
+    // check the admin role
+    app.get("/users/admin/:email", verifyToken, async (req, res) => {
+      // get admin
+      const email = req.params.email;
+      if (email !== req.decoded.email) {
+        return res.status(403).send({ message: "Forbidden access" });
+      }
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      let admin = false;
+      if (user) {
+        admin = user.role === "admin";
+      }
+      res.send({ admin });
+    });
+
     app.post("/users", async (req, res) => {
       const user = req.body;
       //   if user doesn't exits
@@ -61,10 +93,11 @@ async function run() {
       res.send(result);
     });
     // get all users
-    app.get("/users", async (req, res) => {
+    app.get("/users", verifyToken, async (req, res) => {
       const result = await usersCollection.find().toArray();
       res.send(result);
     });
+
     // make admin related api
     app.patch("/users/admin/:id", async (req, res) => {
       const id = req.params.id;
