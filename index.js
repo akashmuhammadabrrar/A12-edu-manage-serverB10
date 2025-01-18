@@ -27,8 +27,24 @@ async function run() {
     await client.connect();
 
     const classCollectionTeacher = client.db("EduManage").collection("classes");
+    const usersCollection = client.db("EduManage").collection("users");
+
+    // get all the classes API
     app.get("/classes", async (req, res) => {
       const result = await classCollectionTeacher.find().toArray();
+      res.send(result);
+    });
+
+    // users related api
+    app.post("/users", async (req, res) => {
+      const user = req.body;
+      //   if user doesn't exits
+      const query = { email: user?.email };
+      const existingUser = await usersCollection.findOne(query);
+      if (existingUser) {
+        return res.send({ message: "user already exists", insertedId: null });
+      }
+      const result = await usersCollection.insertOne(user);
       res.send(result);
     });
 
