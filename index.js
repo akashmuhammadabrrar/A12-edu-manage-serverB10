@@ -75,15 +75,21 @@ async function run() {
       const result = await classCollectionTeacher.find().toArray();
       res.send(result);
     });
+    // post class by teachers
+    app.post("/classes", async (req, res) => {
+      const classes = req.body;
+      const result = await classCollectionTeacher.insertOne(classes);
+      res.send(result);
+    });
 
     // users related api
     // check the admin role
-    app.get("/users/admin/:email", verifyToken, async (req, res) => {
+    app.get("/users/admin/:email", async (req, res) => {
       // get admin
       const email = req.params.email;
-      if (email !== req.decoded.email) {
-        return res.status(403).send({ message: "Forbidden access" });
-      }
+      // if (email !== req.decoded.email) {
+      //   return res.status(403).send({ message: "Forbidden access" });
+      // }
       const query = { email: email };
       const user = await usersCollection.findOne(query);
       let admin = false;
@@ -91,6 +97,21 @@ async function run() {
         admin = user.role === "admin";
       }
       res.send({ admin });
+    });
+    // check the teacher's role
+    app.get("/teacher-req/teacher/:email", verifyToken, async (req, res) => {
+      // get teacher
+      const email = req.params.email;
+      // if (email !== req.decoded.email) {
+      //   return res.status(403).send({ message: "Forbidden access" });
+      // }
+      const query = { email: email };
+      const user = await teacherReqCollection.findOne(query);
+      let teacher = false;
+      if (user) {
+        teacher = user.role === "teacher";
+      }
+      res.send({ teacher });
     });
 
     app.post("/users", async (req, res) => {
@@ -111,19 +132,24 @@ async function run() {
     });
 
     // make admin related api
-    app.patch("/users/admin/:id", async (req, res) => {
-      const id = req.params.id;
-      const filter = { _id: new ObjectId(id) };
-      const updatedDoc = {
-        $set: {
-          role: "admin",
-        },
-      };
-      const result = await usersCollection.updateOne(filter, updatedDoc);
-      res.send(result);
-    });
+    app.patch(
+      "/users/admin/:id",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const id = req.params.id;
+        const filter = { _id: new ObjectId(id) };
+        const updatedDoc = {
+          $set: {
+            role: "admin",
+          },
+        };
+        const result = await usersCollection.updateOne(filter, updatedDoc);
+        res.send(result);
+      }
+    );
     // delete an user by id
-    app.delete("/users/:id", async (req, res) => {
+    app.delete("/users/:id", verifyToken, verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await usersCollection.deleteOne(query);
@@ -131,13 +157,25 @@ async function run() {
     });
 
     // teacher's req related api's
-    app.post("/teacher-req", async (req, res) => {
+    app.post("/teacher-req", verifyToken, async (req, res) => {
       const data = req.body;
       const result = await teacherReqCollection.insertOne(data);
       res.send(result);
     });
+    // make a teacher api
+    app.patch("/teacher-req/teacher/:id", verifyToken, async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          role: "teacher",
+        },
+      };
+      const result = await teacherReqCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    });
 
-    app.get("/teacher-req", async (req, res) => {
+    app.get("/teacher-req", verifyToken, async (req, res) => {
       const result = await teacherReqCollection.find().toArray();
       res.send(result);
     });
