@@ -111,10 +111,18 @@ async function run() {
       );
       res.send(result);
     });
+    // select a specific class by id
+    app.get("/classes/:id", verifyToken, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await classCollectionTeacher.findOne(query);
+      res.send(result);
+      console.log(id);
+    });
 
     // users related api
     // check the admin role
-    app.get("/users/admin/:email", async (req, res) => {
+    app.get("/users/admin/:email", verifyToken, async (req, res) => {
       // get admin
       const email = req.params.email;
       // if (email !== req.decoded.email) {
