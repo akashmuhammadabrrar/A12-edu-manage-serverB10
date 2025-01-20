@@ -82,6 +82,36 @@ async function run() {
       res.send(result);
     });
 
+    // set approve and reject
+    app.patch("/classes/:id", verifyToken, async (req, res) => {
+      const id = req.params.id;
+      console.log(id);
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          status: "approve",
+        },
+      };
+      const result = await classCollectionTeacher.updateOne(filter, updatedDoc);
+      res.send(result);
+    });
+    // ret reject
+    app.patch("/classes/reject/:id", verifyToken, async (req, res) => {
+      const id = req.params.id;
+      console.log(id);
+      const filter = { _id: new ObjectId(id) };
+      const updatedDocR = {
+        $set: {
+          status: "rejected",
+        },
+      };
+      const result = await classCollectionTeacher.updateOne(
+        filter,
+        updatedDocR
+      );
+      res.send(result);
+    });
+
     // users related api
     // check the admin role
     app.get("/users/admin/:email", async (req, res) => {
