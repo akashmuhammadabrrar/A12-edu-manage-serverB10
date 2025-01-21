@@ -33,6 +33,7 @@ async function run() {
     const teacherReqCollection = client
       .db("EduManage")
       .collection("teacher-req");
+    const paymentsCollection = client.db("EduManage").collection("payments");
 
     // jwt related api
     app.post("/jwt", async (req, res) => {
@@ -167,7 +168,11 @@ async function run() {
     // get all users
     app.get("/users", verifyToken, verifyAdmin, async (req, res) => {
       const result = await usersCollection.find().toArray();
-      res.send(result);
+      res.send({ result, count });
+    });
+    app.get("/api/user-count", async (req, res) => {
+      const count = await usersCollection.countDocuments();
+      res.send({ count });
     });
 
     // make admin related api
@@ -220,18 +225,93 @@ async function run() {
     });
 
     // payment related api
-    app.post("/create-payment-intent", async (req, res) => {
-      const { price } = req.body;
-      const amount = parseInt(price * 100);
+    // app.post("/create-payment-intent/:id", async (req, res) => {
+    //   const { price } = req.body;
+    //   const id = req.params.id;
+    //   const query = { _id: new ObjectId(id) };
+    //   const TeacherClass = await classCollectionTeacher.findOne(query);
 
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: amount,
-        currency: "usd",
-        payment_method_types: ["card"],
-      });
-      res.send({
-        clientSecret: paymentIntent.client_secret,
-      });
+    //   const amount = parseInt(price * 100);
+    //   console.log(amount, "amount inside the intent");
+
+    //   const paymentIntent = await stripe.paymentIntents.create({
+    //     amount: amount,
+    //     currency: "usd",
+    //     payment_method_types: ["card"],
+    //   });
+    //   const updatedDoc = {
+    //     $set: {
+    //       enrollment: enrollment + 1,
+    //     },
+    //   };
+    //   const updEnrRes = await classCollectionTeacher.updateOne(query,updatedDoc)
+    //   res.send({
+    //     clientSecret: paymentIntent.client_secret,
+    //   });
+    // });
+
+    app.post("/create-payment-intent/:id", async (req, res) => {
+      try {
+        const { price } = req.body; // Get price from request body
+        const id = req.params.id; // Get class ID from URL params
+        const query = { _id: new ObjectId(id) };
+
+        const TeacherClass = await classCollectionTeacher.findOne(query);
+        if (!TeacherClass) {
+          return res.status(404).send({ error: "Class not found" });
+        }
+        const amount = parseInt(price * 100);
+        console.log(amount, "amount inside the intent");
+
+        // Create the payment intent
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: amount,
+          currency: "usd",
+          payment_method_types: ["card"],
+        });
+        const updatedDoc = {
+          $set: {
+            enroll: (TeacherClass.enroll || 0) + 1, // If enroll doesn't exist, start from 0
+          },
+        };
+        const updRes = await classCollectionTeacher.updateOne(
+          query,
+          updatedDoc
+        );
+        if (updRes.modifiedCount === 0) {
+          return res
+            .status(500)
+            .send({ error: "Failed to update enrollment count" });
+        }
+        res.send({
+          clientSecret: paymentIntent.client_secret,
+        });
+      } catch (error) {
+        console.error("Error in /create-payment-intent:", error);
+        res.status(500).send({ error: "Internal server error" });
+      }
+    });
+
+    // payment
+    app.post("/payments", async (req, res) => {
+      const payment = req.body;
+      const payResult = await paymentsCollection.insertOne(payment);
+      console.log("payment info", payment);
+      res.send(payResult);
+    });
+
+    // get class inside the payment data
+    app.get("/enrollments", async (req, res) => {
+      const email = req.query.email;
+      if (!email) {
+        return res.status(400).send({ message: "Email is required" });
+      }
+      try {
+        const enrollments = await paymentsCollection.find({ email }).toArray();
+        res.send(enrollments);
+      } catch (error) {
+        res.status(500).send({ message: "Error fetching enrollments", error });
+      }
     });
 
     // Send a ping to confirm a successful connection
