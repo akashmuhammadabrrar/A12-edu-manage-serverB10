@@ -8,7 +8,11 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const port = process.env.PORT || 5000;
 
 // middleware
-app.use(cors());
+app.use(
+  cors({
+    origin: ["http://localhost:5173", "https://edmanage-auth.web.app"],
+  })
+);
 app.use(express.json());
 
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
@@ -26,7 +30,7 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    // await client.connect();
 
     const classCollectionTeacher = client.db("EduManage").collection("classes");
     const usersCollection = client.db("EduManage").collection("users");
@@ -46,7 +50,7 @@ async function run() {
 
     // middlewares
     const verifyToken = (req, res, next) => {
-      console.log("Inside verify token", req.headers.authorization);
+      // console.log("Inside verify token", req.headers.authorization);
       if (!req.headers.authorization) {
         res.status(401).send({ message: "unauthorized access" });
       }
@@ -78,7 +82,7 @@ async function run() {
       res.send(result);
     });
     // post class by teachers
-    app.post("/classes", async (req, res) => {
+    app.post("/classes", verifyToken, async (req, res) => {
       const classes = req.body;
       const result = await classCollectionTeacher.insertOne(classes);
       res.send(result);
@@ -87,7 +91,7 @@ async function run() {
     // set approve and reject
     app.patch("/classes/:id", verifyToken, async (req, res) => {
       const id = req.params.id;
-      console.log(id);
+      // console.log(id);
       const filter = { _id: new ObjectId(id) };
       const updatedDoc = {
         $set: {
@@ -98,33 +102,67 @@ async function run() {
       res.send(result);
     });
     // ret reject
-    app.patch("/classes/reject/:id", verifyToken, async (req, res) => {
-      const id = req.params.id;
-      console.log(id);
-      const filter = { _id: new ObjectId(id) };
-      const updatedDocR = {
-        $set: {
-          status: "rejected",
-        },
-      };
-      const result = await classCollectionTeacher.updateOne(
-        filter,
-        updatedDocR
-      );
-      res.send(result);
-    });
+    app.patch(
+      "/classes/reject/:id",
+      verifyToken,
+      verifyAdmin,
+      async (req, res) => {
+        const id = req.params.id;
+        // console.log(id);
+        const filter = { _id: new ObjectId(id) };
+        const updatedDocR = {
+          $set: {
+            status: "rejected",
+          },
+        };
+        const result = await classCollectionTeacher.updateOne(
+          filter,
+          updatedDocR
+        );
+        res.send(result);
+      }
+    );
     // select a specific class by id
-    app.get("/classes/:id", verifyToken, async (req, res) => {
+    app.get("/classes/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await classCollectionTeacher.findOne(query);
       res.send(result);
-      console.log(id);
+      // console.log(id);
+    });
+    app.get("/classes/teacher/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email };
+      const result = await classCollectionTeacher.find(query).toArray();
+      res.send(result);
+      console.log(email);
+    });
+    // update the added class by a teacher
+    app.put("/classes/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const options = { upsert: true };
+      const updateClass = req.body;
+      const updatedDoc = {
+        $set: {
+          image: updateClass.image,
+          price: updateClass.data.price,
+          title: updateClass.data.title,
+          description: updateClass.data.description,
+        },
+      };
+      console.log(updatedDoc);
+      const result = await classCollectionTeacher.updateOne(
+        filter,
+        updatedDoc,
+        options
+      );
+      res.send(result);
     });
 
     // users related api
     // check the admin role
-    app.get("/users/admin/:email", verifyToken, async (req, res) => {
+    app.get("/users/admin/:email", async (req, res) => {
       // get admin
       const email = req.params.email;
       // if (email !== req.decoded.email) {
@@ -139,7 +177,7 @@ async function run() {
       res.send({ admin });
     });
     // check the teacher's role
-    app.get("/teacher-req/teacher/:email", verifyToken, async (req, res) => {
+    app.get("/teacher-req/teacher/:email", async (req, res) => {
       // get teacher
       const email = req.params.email;
       // if (email !== req.decoded.email) {
@@ -168,7 +206,7 @@ async function run() {
     // get all users
     app.get("/users", verifyToken, verifyAdmin, async (req, res) => {
       const result = await usersCollection.find().toArray();
-      res.send({ result, count });
+      res.send(result);
     });
     app.get("/api/user-count", async (req, res) => {
       const count = await usersCollection.countDocuments();
@@ -261,7 +299,7 @@ async function run() {
           return res.status(404).send({ error: "Class not found" });
         }
         const amount = parseInt(price * 100);
-        console.log(amount, "amount inside the intent");
+        // console.log(amount, "amount inside the intent");
 
         // Create the payment intent
         const paymentIntent = await stripe.paymentIntents.create({
@@ -287,21 +325,21 @@ async function run() {
           clientSecret: paymentIntent.client_secret,
         });
       } catch (error) {
-        console.error("Error in /create-payment-intent:", error);
+        // console.error("Error in /create-payment-intent:", error);
         res.status(500).send({ error: "Internal server error" });
       }
     });
 
     // payment
-    app.post("/payments", async (req, res) => {
+    app.post("/payments", verifyToken, async (req, res) => {
       const payment = req.body;
       const payResult = await paymentsCollection.insertOne(payment);
-      console.log("payment info", payment);
+      // console.log("payment info", payment);
       res.send(payResult);
     });
 
     // get class inside the payment data
-    app.get("/enrollments", async (req, res) => {
+    app.get("/enrollments", verifyToken, async (req, res) => {
       const email = req.query.email;
       if (!email) {
         return res.status(400).send({ message: "Email is required" });
@@ -315,10 +353,10 @@ async function run() {
     });
 
     // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
-    console.log(
-      "Pinged your deployment. You successfully connected to MongoDB!"
-    );
+    // await client.db("admin").command({ ping: 1 });
+    // console.log(
+    //   "Pinged your deployment. You successfully connected to MongoDB!"
+    // );
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
