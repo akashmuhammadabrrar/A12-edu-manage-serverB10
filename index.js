@@ -101,6 +101,46 @@ async function run() {
       const result = await classCollectionTeacher.updateOne(filter, updatedDoc);
       res.send(result);
     });
+
+    // Set up a new route to handle assignment creation
+    app.patch("/classes/:id/assignments", verifyToken, async (req, res) => {
+      const id = req.params.id;
+      const assignmentData = req.body; // Get assignment data from request body
+
+      const filter = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: {
+          assignments: assignmentData, // Store the assignment data
+        },
+      };
+
+      try {
+        const result = await classCollectionTeacher.updateOne(
+          filter,
+          updateDoc
+        );
+
+        if (result.modifiedCount === 0) {
+          throw new Error(
+            "No documents matched the query. Updated 0 documents."
+          );
+        }
+
+        res.status(200).json({
+          status: "success",
+          message: "Assignment updated successfully",
+          data: assignmentData,
+        });
+      } catch (error) {
+        console.error("Error updating assignment:", error);
+        res.status(500).json({
+          status: "error",
+          message: "An error occurred while updating the assignment",
+          error: error.message,
+        });
+      }
+    });
+
     // ret reject
     app.patch(
       "/classes/reject/:id",
@@ -146,17 +186,24 @@ async function run() {
       const updatedDoc = {
         $set: {
           image: updateClass.image,
-          price: updateClass.data.price,
-          title: updateClass.data.title,
-          description: updateClass.data.description,
+          price: updateClass.price,
+          title: updateClass.title,
+          description: updateClass.description,
         },
       };
-      console.log(updatedDoc);
+      // console.log(updatedDoc);
       const result = await classCollectionTeacher.updateOne(
         filter,
         updatedDoc,
         options
       );
+      res.send(result);
+    });
+    // delete a class
+    app.delete("/classes/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await classCollectionTeacher.deleteOne(query);
       res.send(result);
     });
 
