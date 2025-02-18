@@ -38,6 +38,7 @@ async function run() {
       .db("EduManage")
       .collection("teacher-req");
     const paymentsCollection = client.db("EduManage").collection("payments");
+    const feedbackCollection = client.db("EduManage").collection("feedbacks");
 
     // jwt related api
     app.post("/jwt", async (req, res) => {
@@ -85,6 +86,17 @@ async function run() {
     app.post("/classes", verifyToken, async (req, res) => {
       const classes = req.body;
       const result = await classCollectionTeacher.insertOne(classes);
+      res.send(result);
+    });
+    // post feedback data
+    app.post("/feedback", async (req, res) => {
+      const feedback = req.body;
+      const result = await feedbackCollection.insertOne(feedback);
+      res.send(result);
+    });
+    // get feedback data
+    app.get("/feedback", async (req, res) => {
+      const result = await feedbackCollection.find().toArray();
       res.send(result);
     });
 
@@ -251,7 +263,7 @@ async function run() {
       res.send(result);
     });
     // get all users
-    app.get("/users", verifyToken, verifyAdmin, async (req, res) => {
+    app.get("/users", async (req, res) => {
       const result = await usersCollection.find().toArray();
       res.send(result);
     });
